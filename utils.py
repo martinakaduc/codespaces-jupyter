@@ -53,8 +53,7 @@ def plot_uncert(x_test: torch.Tensor, y_pred_mean: torch.Tensor, x_train: torch.
     ax.legend()
 
     if save_file is not None:
-        plt.tight_layout()
-        plt.savefig(save_file, bbox_inches='tight')
+        plt.savefig(save_file)
 
     plt.close(fig)
 
@@ -82,7 +81,6 @@ def lineplot(xs, ys, xlabel, ylabel, ylim=None, save_file=None):
         plt.ylim(0, ylim)
 
     if save_file is not None:
-        plt.tight_layout()
-        plt.savefig(save_file, bbox_inches='tight')
+        plt.savefig(save_file)
 
     plt.close()

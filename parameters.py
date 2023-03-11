@@ -14,8 +14,8 @@ class Parameters:
             self.seeds = args.seeds
         self.batch_size = 32
         self.burnin_epochs = 2000  # 2000
-        self.finetune_epochs = 500  # 500
-        self.mcmc_epochs = 100  # 100
+        self.finetune_epochs = 200  # 500
+        self.mcmc_epochs = 50  # 100
         self.num_models = 10
         self.inital_epochs = self.burnin_epochs + self.mcmc_epochs * self.num_models
         self.loop_epochs = self.finetune_epochs + self.mcmc_epochs * self.num_models
