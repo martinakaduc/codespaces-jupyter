@@ -26,7 +26,6 @@ def init_uniform(m):
 def plot_uncert(x_test: torch.Tensor, y_pred_mean: torch.Tensor, x_train: torch.Tensor, y_train: torch.Tensor,
                 ale: torch.Tensor, epi: torch.Tensor, uncert: torch.Tensor, save_file: str = None):
 
-    plt.figure()
     x_test, y_pred_mean, x_train, y_train = x_test.cpu(
     ), y_pred_mean.cpu(), x_train.cpu(), y_train.cpu()
     ale, epi, uncert = torch.sqrt(ale.cpu()), torch.sqrt(
@@ -57,7 +56,7 @@ def plot_uncert(x_test: torch.Tensor, y_pred_mean: torch.Tensor, x_train: torch.
         plt.tight_layout()
         plt.savefig(save_file, bbox_inches='tight')
 
-    plt.close()
+    plt.close(fig)
 
 
 def set_seed(seed):
@@ -71,7 +70,6 @@ def set_seed(seed):
 
 
 def lineplot(xs, ys, xlabel, ylabel, ylim=None, save_file=None):
-    plt.figure()
     if len(xs) == 1:
         plt.scatter(xs, ys)
     else:
