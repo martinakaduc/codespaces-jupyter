@@ -13,6 +13,13 @@ from models import Model
 from optimizers import SGLD
 from parameters import Parameters
 from threading import Thread
+from torch.multiprocessing import Process, Manager, set_start_method
+
+try:
+    set_start_method("spawn")
+except RuntimeError:
+    pass
+
 from utils import init_uniform, set_seed, plot_uncert, lineplot
 
 sns.set()
@@ -23,22 +30,20 @@ matplotlib.rcParams["text.latex.preamble"] = r"\usepackage{bm}"
 
 def run_by_seed(
     seed,
-    parms,
-    dtype,
-    plot_dir,
     test_losses_by_seed,
     percentage_observed_top1_by_seed,
     percentage_observed_top5_by_seed,
     percentage_observed_top10_by_seed,
     average_observed_y_by_seed,
+    parms,
+    dtype,
+    plot_dir,
 ):
     print(f"==================== Seed {seed} ====================")
     set_seed(seed)
 
     # Initialize model
-    model = Model(in_features = parms.input_dim, 
-                  out_features = parms.output_dim, 
-                  hiddem_dim = parms.hidden_dim).type(dtype)
+    model = Model(out_features=1).type(dtype)
     model.apply(init_uniform)
 
     # Prepare data
@@ -67,10 +72,9 @@ def run_by_seed(
     )
 
     # Plotting
-    x_test, y_test = env.rollout(num_steps=parms.test_size)
+    x_test, y_test = env.rollout(burnin=False, num_steps=parms.test_size)
 
-    with torch.no_grad():
-        y_pred_mean, ale, epi, uncert = predict(models=models, x=x_test)
+    y_pred_mean, ale, epi, uncert = predict(models=models, x=x_test)
     test_loss = F.mse_loss(y_pred_mean, y_test.view(-1)).item()
     print("Test loss:", test_loss)
 
@@ -118,8 +122,7 @@ def run_by_seed(
             weight_decay=parms.weight_decay,
         )
 
-        with torch.no_grad():
-            y_pred_mean, ale, epi, uncert = predict(models=models, x=x_test)
+        y_pred_mean, ale, epi, uncert = predict(models=models, x=x_test)
 
         # Record percentage observed
         percentage_observed_top1.append(env.get_percentage_observed_topK(k=1))
@@ -167,7 +170,6 @@ if __name__ == "__main__":
     # Setting up parameters
     args = argparse.ArgumentParser()
     args.add_argument("--algo", type=str, default="random")
-    args.add_argument("--env", type=str, default="Sine")
     args.add_argument("--exp_id", type=int, default=0)
     args.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
     args.add_argument("--allow_replacement", action="store_true")
@@ -193,39 +195,50 @@ if __name__ == "__main__":
     percentage_observed_top10_by_seed = {}
     average_observed_y_by_seed = {}
 
-    for seed in parms.seeds:
-        run_by_seed(
-            seed,
-            parms,
-            dtype,
-            plot_dir,
-            test_losses_by_seed,
-            percentage_observed_top1_by_seed,
-            percentage_observed_top5_by_seed,
-            percentage_observed_top10_by_seed,
-            average_observed_y_by_seed,
-        )
-    # list_threads = []
-    # for seed in parms.seeds:
-    #     t = Thread(target=run_by_seed,
-    #                 args=(seed,
-    #                       parms,
-    #                       dtype,
-    #                       plot_dir,
-    #                       test_losses_by_seed,
-    #                       percentage_observed_top1_by_seed,
-    #                       percentage_observed_top5_by_seed,
-    #                       percentage_observed_top10_by_seed,
-    #                       average_observed_y_by_seed,
-    #                     )
-    #             )
-    #     list_threads.append(t)
+    with Manager() as manager:
+        test_losses_by_seed = manager.dict()
+        percentage_observed_top1_by_seed = manager.dict()
+        percentage_observed_top5_by_seed = manager.dict()
+        percentage_observed_top10_by_seed = manager.dict()
+        average_observed_y_by_seed = manager.dict()
 
-    # for t in list_threads:
-    #     t.start()
+        list_threads = []
+        for seed in parms.seeds:
+            # run_by_seed(seed,
+            #             test_losses_by_seed,
+            #             percentage_observed_top1_by_seed,
+            #             percentage_observed_top5_by_seed,
+            #             percentage_observed_top10_by_seed,
+            #             average_observed_y_by_seed
+            # )
 
-    # for t in list_threads:
-    #     t.join()
+            t = Process(
+                target=run_by_seed,
+                args=(
+                    seed,
+                    test_losses_by_seed,
+                    percentage_observed_top1_by_seed,
+                    percentage_observed_top5_by_seed,
+                    percentage_observed_top10_by_seed,
+                    average_observed_y_by_seed,
+                    parms,
+                    dtype,
+                    plot_dir,
+                ),
+            )
+            list_threads.append(t)
+
+        for t in list_threads:
+            t.start()
+
+        for t in list_threads:
+            t.join()
+
+        test_losses_by_seed = dict(test_losses_by_seed)
+        percentage_observed_top1_by_seed = dict(percentage_observed_top1_by_seed)
+        percentage_observed_top5_by_seed = dict(percentage_observed_top5_by_seed)
+        percentage_observed_top10_by_seed = dict(percentage_observed_top10_by_seed)
+        average_observed_y_by_seed = dict(average_observed_y_by_seed)
 
     # Save results
     pickle.dump(
